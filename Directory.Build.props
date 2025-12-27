@@ -31,7 +31,10 @@
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)strongname.snk</AssemblyOriginatorKeyFile>
 
-    <PackageProjectUrl>https://github.com/AArnott/Xunit.SkippableFact</PackageProjectUrl>
+    <!-- Keep repository metadata accurate even when local git remotes differ. -->
+    <RepositoryUrl Condition="'$(GITHUB_REPOSITORY)' != ''">https://github.com/$(GITHUB_REPOSITORY)</RepositoryUrl>
+    <RepositoryUrl Condition="'$(RepositoryUrl)' == ''">https://github.com/JKamsker/Xunit.SkippableFact</RepositoryUrl>
+    <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
     <Company>Andrew Arnott</Company>
     <Authors>Andrew Arnott</Authors>
     <PackageLicenseExpression>MS-PL</PackageLicenseExpression>
