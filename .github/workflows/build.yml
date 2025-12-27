@@ -3,11 +3,9 @@ name: 🏭 Build
 on:
   push:
     branches:
-    - main
-    - 'v*.*'
-    - validate/*
+      - fix/*
     tags:
-    - v*.*
+      - v*.*
   pull_request:
   workflow_dispatch:
 
@@ -26,78 +24,82 @@ jobs:
       fail-fast: false
       matrix:
         os:
-        - ubuntu-22.04
-        - macos-14
-        - windows-2022
+          - ubuntu-22.04
+          - macos-14
+          - windows-2022
 
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
-      with:
-        fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
-    - name: ⚙ Install prerequisites
-      run: |
-        ./init.ps1 -UpgradePrerequisites
-        dotnet --info
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
+      - name: ⚙ Install prerequisites
+        run: |
+          ./init.ps1 -UpgradePrerequisites
+          dotnet --info
 
-        # Print mono version if it is present.
-        if (Get-Command mono -ErrorAction SilentlyContinue) {
-          mono --version
-        }
-      shell: pwsh
-    - name: ⚙️ Set pipeline variables based on source
-      run: tools/variables/_define.ps1
-      shell: pwsh
-    - name: 🛠 build
-      run: dotnet build -t:build,pack --no-restore -c ${{ env.BUILDCONFIGURATION }} -warnAsError -warnNotAsError:NU1901,NU1902,NU1903,NU1904 /bl:"${{ runner.temp }}/_artifacts/build_logs/build.binlog"
-    - name: 🧪 test
-      run: tools/dotnet-test-cloud.ps1 -Configuration ${{ env.BUILDCONFIGURATION }} -Agent ${{ runner.os }}
-      shell: pwsh
-    - name: 💅🏻 Verify formatted code
-      run: dotnet format --verify-no-changes --no-restore
-      shell: pwsh
-      if: runner.os == 'Linux'
-    - name: 📚 Verify docfx build
-      run: dotnet docfx docfx/docfx.json --warningsAsErrors --disableGitFeatures
-      if: runner.os == 'Linux'
-    - name: ⚙ Update pipeline variables based on build outputs
-      run: tools/variables/_define.ps1
-      shell: pwsh
-    - name: 📢 Publish artifacts
-      uses: ./.github/actions/publish-artifacts
-      if: cancelled() == false
-    - name: 📢 Publish code coverage results to codecov.io
-      run: ./tools/publish-CodeCov.ps1 -CodeCovToken "${{ env.codecov_token }}" -PathToCodeCoverage "${{ runner.temp }}/_artifacts/coverageResults" -Name "${{ runner.os }} Coverage Results" -Flags "${{ runner.os }}"
-      shell: pwsh
-      timeout-minutes: 3
-      continue-on-error: true
-      if: env.codecov_token != ''
+          # Print mono version if it is present.
+          if (Get-Command mono -ErrorAction SilentlyContinue) {
+            mono --version
+          }
+        shell: pwsh
+      - name: ⚙️ Set pipeline variables based on source
+        run: tools/variables/_define.ps1
+        shell: pwsh
+      - name: 🛠 build
+        run: dotnet build -t:build,pack --no-restore -c ${{ env.BUILDCONFIGURATION }} -warnAsError -warnNotAsError:NU1901,NU1902,NU1903,NU1904 /bl:"${{ runner.temp }}/_artifacts/build_logs/build.binlog"
+      - name: 🧪 test
+        run: tools/dotnet-test-cloud.ps1 -Configuration ${{ env.BUILDCONFIGURATION }} -Agent ${{ runner.os }}
+        shell: pwsh
+      - name: 💅🏻 Verify formatted code
+        run: dotnet format --verify-no-changes --no-restore
+        shell: pwsh
+        if: runner.os == 'Linux'
+      - name: 📚 Verify docfx build
+        run: dotnet docfx docfx/docfx.json --warningsAsErrors --disableGitFeatures
+        if: runner.os == 'Linux'
+      - name: ⚙ Update pipeline variables based on build outputs
+        run: tools/variables/_define.ps1
+        shell: pwsh
+      - name: 📢 Publish artifacts
+        uses: ./.github/actions/publish-artifacts
+        if: cancelled() == false
+      - name: 📢 Publish code coverage results to codecov.io
+        run: ./tools/publish-CodeCov.ps1 -CodeCovToken "${{ env.codecov_token }}" -PathToCodeCoverage "${{ runner.temp }}/_artifacts/coverageResults" -Name "${{ runner.os }} Coverage Results" -Flags "${{ runner.os }}"
+        shell: pwsh
+        timeout-minutes: 3
+        continue-on-error: true
+        if: env.codecov_token != ''
 
   docs:
     name: 📃 Docs
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
-    - name: 🔗 Markup Link Checker (mlc)
-      uses: becheran/mlc@18a06b3aa2901ca197de59c8b0b1f54fdba6b3fa # v1.0.0
-      with:
-        args: --do-not-warn-for-redirect-to https://learn.microsoft.com*,https://dotnet.microsoft.com/*,https://dev.azure.com/*,https://app.codecov.io/* -p docfx -i https://www.npmjs.com/package/*,https://get.dot.net/
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      - name: 🔗 Markup Link Checker (mlc)
+        uses: becheran/mlc@18a06b3aa2901ca197de59c8b0b1f54fdba6b3fa # v1.0.0
+        with:
+          args: --do-not-warn-for-redirect-to https://learn.microsoft.com*,https://dotnet.microsoft.com/*,https://dev.azure.com/*,https://app.codecov.io/* -p docfx -i https://www.npmjs.com/package/*,https://get.dot.net/
 
   ship:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
-      with:
-        fetch-depth: 1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 1
 
-    - name: 🔻 Download deployables artifacts
-      uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
-      with:
-        name: deployables-Linux
-        path: ${{ runner.temp }}/deployables
+      - name: 🔻 Download deployables artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: deployables-Linux
+          path: ${{ runner.temp }}/deployables
 
-    - name: 🚀 Push NuGet packages
-      run: |
-        rm global.json
-        dotnet nuget push ${{ runner.temp }}/deployables/*.nupkg --source https://api.nuget.org/v3/index.json -k '${{ secrets.NUGET_API_KEY }}'
+      - name: 🚀 Push NuGet packages to GitHub Packages
+        run: |
+          rm -f global.json
+          dotnet nuget add source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" --name github --username "${{ github.actor }}" --password "${{ github.token }}" --store-password-in-clear-text
+          dotnet nuget push ${{ runner.temp }}/deployables/*.nupkg --source github --api-key "${{ github.token }}" --skip-duplicate
